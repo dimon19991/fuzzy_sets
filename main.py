@@ -1,6 +1,8 @@
+import matplotlib.pyplot as plt
 import numpy as np
 
-fuzzy_system = {"input_data": {}, "output_data": {}, "rules": [[], []], "evaluate_output": {}, "fazification": {}}
+fuzzy_system = {"input_data": {}, "output_data": {}, "rules": [[], [], []], "evaluate_output": {}, "fazification": {},
+                "activation": [], "accumulation": {"res": {"dom": [], "domain": []}}}
 
 
 def domain(domain_min, domain_max, res):
@@ -116,13 +118,100 @@ def evaluate_output(res):
         fuzzy_system["evaluate_output"][key] = value
 
 
-def get_mu(name):
-    fuzzy_system["fazification"][name] = {}
-    x_val = fuzzy_system["evaluate_output"][name]
-    kays = list(fuzzy_system["input_data"][name].keys())[3:]
-    for i in kays:
-        dodain_par = fuzzy_system["input_data"][name][i]["domain"]
-        dod_par = fuzzy_system["input_data"][name][i]["dom"]
+def fazification():
+    for name in fuzzy_system["evaluate_output"].keys():
+        fuzzy_system["fazification"][name] = {}
+        x_val = fuzzy_system["evaluate_output"][name]
+        kays = list(fuzzy_system["input_data"][name].keys())[3:]
+        for i in kays:
+            dodain_par = fuzzy_system["input_data"][name][i]["domain"]
+            dod_par = fuzzy_system["input_data"][name][i]["dom"]
+
+            nearest = np.abs(dodain_par - x_val).argmin()
+            nearest_m_1 = np.abs(x_val - dodain_par[nearest - 1])
+            nearest_p_1 = np.abs(x_val - dodain_par[nearest + 1])
+
+            if nearest_m_1 < nearest_p_1:
+                minn = nearest - 1
+                maxx = nearest
+            else:
+                minn = nearest
+                maxx = nearest + 1
+
+            y = ((dod_par[maxx] - dod_par[minn]) * (x_val - dodain_par[minn])) / (dodain_par[maxx] - dodain_par[minn]) + \
+                dod_par[minn]
+
+            fuzzy_system["fazification"][name][i] = y
+
+
+def aggregation():
+    for i in fuzzy_system["rules"][0]:
+        val_1 = fuzzy_system["fazification"][i[0][0]][i[0][1]]
+        val_2 = fuzzy_system["fazification"][i[1][0]][i[1][1]]
+        fuzzy_system["rules"][2].append(np.minimum(val_1, val_2))
+
+
+def activation():
+    k = 0
+    for i in fuzzy_system["rules"][1]:
+        domaine = fuzzy_system["output_data"][i[0][0]][i[0][1]]["dom"]
+        agr = fuzzy_system["rules"][2][k]
+        fuzzy_system["activation"].append(np.minimum(domaine, agr))
+        k += 1
+
+
+def accumulation():
+    dom = np.zeros(list(fuzzy_system["output_data"].values())[-1]["len"])
+    for i in fuzzy_system["activation"]:
+        dom = np.maximum(i, dom)
+    fuzzy_system["accumulation"]["res"]["dom"] = dom
+    fuzzy_system["accumulation"]["res"]["domain"] = list(list(fuzzy_system["output_data"].values())[-1].values())[-1][
+        "domain"]
+
+
+def plot_system():
+    for idx, var_name in enumerate(fuzzy_system["input_data"]):
+        plot_variable(data=list(fuzzy_system["input_data"][var_name].items())[3:], name=var_name)
+
+    for idx, var_name in enumerate(fuzzy_system["output_data"]):
+        plot_variable(data=list(fuzzy_system["output_data"][var_name].items())[3:], name=var_name)
+
+    for idx, var_name_1 in enumerate(fuzzy_system["accumulation"]):
+        plot_variable(data=[*list(fuzzy_system["output_data"][var_name].items())[3:], *list(fuzzy_system["accumulation"].items())], name=var_name_1)
+
+
+def plot_variable(data, name, ax=None, show=True):
+    if ax == None:
+        ax = plt.subplot(111)
+
+    for n, s in data:
+        if len(list(filter(lambda i: i[0] == "res", data))) > 0:
+            if n == "res":
+                ax.plot(s["domain"], s["dom"], label=n, color="blue")
+            else:
+                ax.plot(s["domain"], s["dom"], label=n, color="grey")
+        else:
+            ax.plot(s["domain"], s["dom"], label=n)
+    # Shrink current axis by 20%
+    pos = ax.get_position()
+    ax.set_position([pos.x0, pos.y0, pos.width * 0.8, pos.height])
+    ax.grid(True, which='both', alpha=0.4)
+    ax.set_title(name)
+    ax.set(xlabel='x', ylabel='$\mu (x)$')
+
+    # Put a legend to the right of the current axis
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+    if show:
+        plt.show()
+
+
+def defazification():
+    for name in fuzzy_system["evaluate_output"].keys():
+        x_val = fuzzy_system["evaluate_output"][name]
+
+        dodain_par = fuzzy_system["accumulation"]["res"]["domain"]
+        dod_par = fuzzy_system["accumulation"]["res"]["dom"]
 
         nearest = np.abs(dodain_par - x_val).argmin()
         nearest_m_1 = np.abs(x_val - dodain_par[nearest - 1])
@@ -135,14 +224,10 @@ def get_mu(name):
             minn = nearest
             maxx = nearest + 1
 
-        y = ((dod_par[maxx]-dod_par[minn])*(x_val-dodain_par[minn]))/(dodain_par[maxx]-dodain_par[minn]) + dod_par[minn]
+        y = ((dod_par[maxx] - dod_par[minn]) * (x_val - dodain_par[minn])) / (dodain_par[maxx] - dodain_par[minn]) + \
+            dod_par[minn]
 
-        fuzzy_system["fazification"][name][i] = y
-
-
-def fazification():
-    for i in fuzzy_system["evaluate_output"].keys():
-        get_mu(i)
+        print(x_val, y)
 
 
 input_1 = InputVariable('Уровень', 0, 9, 1000)
@@ -155,55 +240,55 @@ create_z_linar('SS', 0.2, 0.3, input_2)
 create_trapezoidal('MM', 0.15, 0.25, 0.35, 0.45, input_2)
 create_s_linar('LL', 0.3, 0.4, input_2)
 
-output_1 = OutputVariable('Speed', 0, 10, 1000)
-create_z_linar('Slow', 1, 5, output_1)
-create_trapezoidal('Moderate', 1, 4, 6, 9, output_1)
-create_s_linar('Fast', 5, 9, output_1)
+output_1 = OutputVariable('Приток', 0, 0.5, 1000)
+create_z_linar('Ss', 0.20, 0.25, output_1)
+create_trapezoidal('Mm', 0.20, 0.25, 0.35, 0.40, output_1)
+create_s_linar('Ll', 0.35, 0.40, output_1)
 
 add_rule(
     {'Уровень': 'S',
      'Расход': 'LL'},
-    {'Speed': 'Slow'})
+    {'Приток': 'Ll'})
 
 add_rule(
     {'Уровень': 'S',
      'Расход': 'MM'},
-    {'Speed': 'Slow'})
+    {'Приток': 'Ll'})
 
 add_rule(
     {'Уровень': 'S',
      'Расход': 'SS'},
-    {'Speed': 'Slow'})
+    {'Приток': 'Mm'})
 
 add_rule(
     {'Уровень': 'M',
      'Расход': 'LL'},
-    {'Speed': 'Moderate'})
+    {'Приток': 'Ll'})
 
 add_rule(
     {'Уровень': 'M',
      'Расход': 'MM'},
-    {'Speed': 'Moderate'})
+    {'Приток': 'Mm'})
 
 add_rule(
     {'Уровень': 'M',
      'Расход': 'SS'},
-    {'Speed': 'Moderate'})
+    {'Приток': 'Mm'})
 
 add_rule(
     {'Уровень': 'L',
      'Расход': 'LL'},
-    {'Speed': 'Fast'})
+    {'Приток': 'Mm'})
 
 add_rule(
     {'Уровень': 'L',
      'Расход': 'MM'},
-    {'Speed': 'Fast'})
+    {'Приток': 'Ss'})
 
 add_rule(
     {'Уровень': 'L',
      'Расход': 'SS'},
-    {'Speed': 'Fast'})
+    {'Приток': 'Ss'})
 
 evaluate_output({
     'Уровень': 2.5,
@@ -211,5 +296,15 @@ evaluate_output({
 })
 
 fazification()
+
+aggregation()
+
+activation()
+
+accumulation()
+
+defazification()
+
+plot_system()
 
 print()
