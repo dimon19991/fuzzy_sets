@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 fuzzy_system = {"input_data": {}, "output_data": {}, "rules": [[], [], []], "evaluate_output": {}, "fazification": {},
-                "activation": [], "accumulation": {"res": {"dom": [], "domain": []}}}
+                "activation": [], "accumulation": {"res": {"dom": [], "domain": []}}, "output": {}}
 
 
 def domain(domain_min, domain_max, res):
@@ -177,7 +177,8 @@ def plot_system():
         plot_variable(data=list(fuzzy_system["output_data"][var_name].items())[3:], name=var_name)
 
     for idx, var_name_1 in enumerate(fuzzy_system["accumulation"]):
-        plot_variable(data=[*list(fuzzy_system["output_data"][var_name].items())[3:], *list(fuzzy_system["accumulation"].items())], name=var_name_1)
+        plot_variable(data=[*list(fuzzy_system["output_data"][var_name].items())[3:],
+                            *list(fuzzy_system["accumulation"].items())], name=var_name_1)
 
 
 def plot_variable(data, name, ax=None, show=True):
@@ -207,40 +208,43 @@ def plot_variable(data, name, ax=None, show=True):
 
 
 def defazification():
-    for name in fuzzy_system["evaluate_output"].keys():
-        x_val = fuzzy_system["evaluate_output"][name]
+    sum_1 = 0
+    sum_2 = 0
+    for i in range(len(fuzzy_system["accumulation"]["res"]["dom"])):
+        sum_1 += (fuzzy_system["accumulation"]["res"]["dom"][i] * fuzzy_system["accumulation"]["res"]["domain"][i])
+        sum_2 += fuzzy_system["accumulation"]["res"]["dom"][i]
+    fuzzy_system["output"]["centre_of_gravity"] = sum_1 / sum_2
 
-        dodain_par = fuzzy_system["accumulation"]["res"]["domain"]
-        dod_par = fuzzy_system["accumulation"]["res"]["dom"]
-
-        nearest = np.abs(dodain_par - x_val).argmin()
-        nearest_m_1 = np.abs(x_val - dodain_par[nearest - 1])
-        nearest_p_1 = np.abs(x_val - dodain_par[nearest + 1])
-
-        if nearest_m_1 < nearest_p_1:
-            minn = nearest - 1
-            maxx = nearest
+    i = 0
+    j = shape - 1
+    sum_l = 0
+    sum_r = 0
+    while i != j:
+        if sum_r > sum_l:
+            sum_l += fuzzy_system["accumulation"]["res"]["dom"][j]
+            j -= 1
         else:
-            minn = nearest
-            maxx = nearest + 1
+            sum_r += fuzzy_system["accumulation"]["res"]["dom"][i]
+            i += 1
 
-        y = ((dod_par[maxx] - dod_par[minn]) * (x_val - dodain_par[minn])) / (dodain_par[maxx] - dodain_par[minn]) + \
-            dod_par[minn]
+    fuzzy_system["output"]["centre_of_area"] = (fuzzy_system["accumulation"]["res"]["dom"][i] *
+                                                fuzzy_system["accumulation"]["res"]["domain"][i]) / \
+                                               fuzzy_system["accumulation"]["res"]["dom"][i]
 
-        print(x_val, y)
 
+shape = 1000
 
-input_1 = InputVariable('Уровень', 0, 9, 1000)
+input_1 = InputVariable('Уровень', 0, 9, shape)
 create_z_linar('S', 2, 4, input_1)
 create_trapezoidal('M', 2, 4, 6, 8, input_1)
 create_s_linar('L', 6, 8, input_1)
 
-input_2 = InputVariable('Расход', 0, 0.5, 1000)
+input_2 = InputVariable('Расход', 0, 0.5, shape)
 create_z_linar('SS', 0.2, 0.3, input_2)
 create_trapezoidal('MM', 0.15, 0.25, 0.35, 0.45, input_2)
 create_s_linar('LL', 0.3, 0.4, input_2)
 
-output_1 = OutputVariable('Приток', 0, 0.5, 1000)
+output_1 = OutputVariable('Приток', 0, 0.5, shape)
 create_z_linar('Ss', 0.20, 0.25, output_1)
 create_trapezoidal('Mm', 0.20, 0.25, 0.35, 0.40, output_1)
 create_s_linar('Ll', 0.35, 0.40, output_1)
